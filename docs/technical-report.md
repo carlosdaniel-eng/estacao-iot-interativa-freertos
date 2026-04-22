@@ -1,86 +1,118 @@
 # Relatorio Tecnico
 
-## 1. Objetivo do projeto
+## 1. Apresentacao
 
-O projeto implementa uma estacao IoT interativa baseada em FreeRTOS, com monitoramento ambiental, interface local, conectividade WiFi e integracao MQTT com o Adafruit IO. A solucao foi organizada em componentes para facilitar manutencao, reuso e evolucao.
+O projeto consiste em uma estacao IoT interativa desenvolvida para a Franzininho WiFi LAB01. A proposta foi reunir em um unico sistema os principais conteudos trabalhados no curso, incluindo tarefas com FreeRTOS, leitura de sensores, acionamento de atuadores, comunicacao WiFi, uso de MQTT e armazenamento de dados em memoria nao volatil.
 
-## 2. Conceitos do curso aplicados
+## 2. Objetivo
 
-### FreeRTOS
+O objetivo principal foi montar uma aplicacao capaz de monitorar temperatura, umidade e luminosidade, publicar essas informacoes no Adafruit IO e reagir localmente quando os valores saem dos limites definidos pelo usuario.
 
-- Uso de tarefas dedicadas para aquisicao de sensores, interface local e tratamento de entradas.
-- Uso de fila para transportar eventos do teclado.
-- Uso de mutex para proteger o estado compartilhado da interface e dos limites.
+Tambem foi considerado importante permitir configuracao diretamente no dispositivo, sem depender apenas da interface remota. Por isso, o teclado e o display OLED foram usados como interface local de operacao.
 
-### Perifericos do microcontrolador
+## 3. Recursos utilizados
 
-- ADC para leitura do LDR.
-- GPIO para o DHT11 e teclado matricial.
-- I2C para o display OLED SSD1306.
-- PWM com LEDC para LED RGB e buzzer.
-- UART para comandos e consulta dos logs.
+### Hardware
 
-### Conectividade
+- Franzininho WiFi LAB01
+- Sensor DHT11
+- LDR
+- Display OLED SSD1306
+- Teclado matricial 4x4
+- LED RGB
+- Buzzer
 
-- WiFi em modo `STA` para conexao a rede local.
-- MQTT sobre Adafruit IO para telemetria e acionamento remoto.
-- SNTP para obter data e hora reais e enriquecer o log de alarmes.
+### Software e conceitos
 
-### Persistencia
+- ESP-IDF
+- FreeRTOS
+- MQTT
+- Adafruit IO
+- NVS
+- SNTP
+- PWM, GPIO, ADC e I2C
 
-- NVS usada para salvar os limites configurados pelo usuario.
-- NVS usada para guardar o historico textual de alarmes.
+## 4. Estrutura do software
 
-## 3. Arquitetura proposta
+O codigo foi dividido em componentes para evitar concentrar toda a logica em um unico arquivo. Essa separacao deixou o projeto mais legivel e facilitou o reuso das partes principais.
 
-O `app_main.c` inicializa os modulos e cria as tarefas principais. A leitura dos sensores ocorre de forma periodica. Cada amostra e comparada com os limites configurados. Caso uma violacao seja detectada, o sistema:
+Cada modulo tem uma responsabilidade especifica:
 
-1. Registra o evento em NVS.
-2. Aciona o buzzer.
-3. Atualiza o OLED.
-4. Publica o estado do alarme via MQTT.
+- WiFi
+- MQTT
+- sensores
+- display
+- teclado
+- atuadores
+- alarmes
+- armazenamento
+- tempo
+- console serial
 
-O LED RGB e tratado como um atuador remoto: os valores de vermelho, verde e azul chegam por feeds separados do Adafruit IO e sao aplicados por PWM.
+No arquivo principal `app_main.c`, os modulos sao inicializados e as tarefas sao criadas. A partir disso, o sistema passa a executar a leitura periodica dos sensores, atualizar a interface local, receber entradas do teclado e publicar informacoes no broker MQTT.
 
-## 4. Justificativas tecnicas
+## 5. Aplicacao dos conceitos do curso
 
-### Modularizacao em componentes
+### Uso do FreeRTOS
 
-Separar WiFi, MQTT, sensores, display e armazenamento reduz acoplamento e facilita testes isolados. Essa estrutura tambem ajuda na avaliacao, porque deixa claro o papel de cada parte do sistema.
+O projeto utiliza tarefas separadas para organizacao das funcoes principais. Essa divisao ajuda a manter a leitura dos sensores, a atualizacao do display e o tratamento do teclado funcionando de forma concorrente.
 
-### Uso de filas e mutex
+Tambem foram utilizados:
 
-O teclado gera eventos assincronos. Uma fila evita polling misturado com logica de negocio. O mutex garante consistencia ao acessar limites, leituras e estado do alarme em tarefas diferentes.
+- fila para transportar as teclas lidas pelo teclado matricial
+- mutex para proteger o estado compartilhado entre tarefas
 
-### Log textual em NVS
+Esses recursos foram importantes para evitar mistura entre leitura de entrada, atualizacao de interface e logica de alarme.
 
-Para um projeto academico, guardar o log como texto simplifica a inspecao via serial e reduz complexidade de serializacao. Em uma versao futura, o log pode virar uma estrutura circular binaria.
+### Leitura de sensores
 
-### Buzzer com desligamento manual
+O DHT11 foi usado para temperatura e umidade, enquanto o LDR foi ligado ao ADC para medicao de luminosidade. As leituras sao feitas periodicamente e armazenadas em uma estrutura comum, o que facilita a comparacao com os limites e o envio por MQTT.
 
-O alarme sonoro foi pensado para ficar latched durante o episodio de falha, exigindo acao humana para silenciamento. Isso atende ao requisito de seguranca operacional do enunciado.
+### Comunicacao WiFi e MQTT
 
-## 5. Fluxo de funcionamento
+O sistema opera somente em modo Station. Depois de conectar na rede, ele inicia a comunicacao MQTT com o Adafruit IO. Os dados de temperatura, umidade e luminosidade sao publicados em feeds separados.
 
-1. O sistema sobe o NVS e carrega os limites salvos.
-2. Inicia WiFi em modo Station.
-3. Inicia sincronizacao SNTP.
-4. Conecta ao Adafruit IO via MQTT.
-5. Le periodicamente luminosidade, temperatura e umidade.
-6. Publica os dados nos feeds.
-7. Compara a leitura com os limites.
-8. Caso haja violacao, registra o alarme, aciona buzzer e informa no OLED.
-9. O usuario pode ajustar limites pelo teclado ou consultar logs pela serial.
+O LED RGB tambem foi integrado ao Adafruit IO. Assim, o usuario pode alterar os valores dos canais vermelho, verde e azul de forma remota.
 
-## 6. Possiveis melhorias
+### Interface local
 
-- Persistir tambem o estado do LED RGB.
-- Adicionar pagina extra no OLED para navegar por todo o historico de configuracoes.
-- Publicar os limites atuais no Adafruit IO.
-- Implementar filtro ou media movel no LDR para reduzir ruido.
-- Trocar o log textual por buffer circular com indice.
-- Adicionar watchdog de tarefas e reconexao MQTT mais elaborada.
+O display OLED mostra informacoes de conectividade, leituras e alarmes. O teclado permite navegar pelos campos e alterar os valores minimos e maximos configurados para cada variavel monitorada.
 
-## 7. Conclusao
+Essa parte foi importante porque tornou o sistema utilizavel mesmo sem depender diretamente do computador.
 
-O projeto atende os requisitos centrais do enunciado e demonstra a integracao entre RTOS, perifericos, rede e persistencia. A principal qualidade da solucao esta na organizacao modular, que facilita entendimento, manutencao e apresentacao academica.
+### Alarmes e persistencia
+
+Quando uma leitura ultrapassa os limites configurados, o buzzer e acionado e um registro textual e salvo em NVS. O log guarda data, hora e os valores lidos no momento do evento.
+
+Foi escolhida uma abordagem textual simples para os logs por ser suficiente para a proposta do projeto e por facilitar a consulta pela serial.
+
+## 6. Fluxo geral do sistema
+
+1. O NVS e inicializado.
+2. Os limites salvos anteriormente sao carregados.
+3. O WiFi conecta em modo Station.
+4. O horario e sincronizado por SNTP.
+5. O cliente MQTT conecta ao Adafruit IO.
+6. Os sensores sao lidos periodicamente.
+7. Os valores sao comparados com os limites configurados.
+8. Se houver violacao, o alarme e disparado e o evento e salvo.
+9. Os dados tambem sao enviados para os feeds MQTT.
+
+## 7. Justificativas de implementacao
+
+- A modularizacao foi escolhida para facilitar entendimento e manutencao.
+- O uso de fila e mutex foi adotado para organizar a concorrencia entre tarefas.
+- O buzzer permanece ativo ate o desligamento manual para deixar o alarme mais evidente.
+- O uso de NVS permitiu manter configuracoes e historico mesmo apos reinicializacao.
+
+## 8. Melhorias futuras
+
+- adicionar filtro nas leituras do LDR
+- publicar tambem os limites configurados no Adafruit IO
+- melhorar a navegacao do display com mais telas
+- usar uma estrutura circular para os logs
+- adicionar tratamento mais completo para falhas de sensores
+
+## 9. Conclusao
+
+O projeto atende a proposta de integrar sensores, atuadores, conectividade e interface local em uma aplicacao unica. Alem disso, a divisao em componentes ajudou a aplicar a ideia de codigo reutilizavel, que era um dos focos da atividade.

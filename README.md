@@ -1,21 +1,22 @@
 # Estacao IoT Interativa com FreeRTOS e MQTT
 
-Projeto-base em ESP-IDF para a Franzininho WiFi LAB01, organizado em componentes reutilizaveis para sensores, atuadores, WiFi, MQTT, interface local e persistencia em NVS.
+Este repositorio apresenta o desenvolvimento de uma estacao IoT para a placa Franzininho WiFi LAB01. O projeto foi organizado em modulos separados para facilitar a manutencao do codigo e aplicar, na pratica, os conteudos estudados sobre FreeRTOS, comunicacao MQTT, sensores, atuadores e persistencia de dados.
 
-## O que o projeto entrega
+## Funcionalidades implementadas
 
-- Leitura periodica de luminosidade via LDR e temperatura/umidade via DHT11
-- Publicacao MQTT no Adafruit IO para `temperatura`, `umidade`, `luminosidade` e `alarmes`
-- Controle remoto do LED RGB por feeds MQTT `led-red`, `led-green` e `led-blue`
+- Leitura periodica de temperatura e umidade com o DHT11
+- Leitura de luminosidade por meio de um LDR
+- Publicacao dos dados no Adafruit IO via MQTT
+- Controle remoto do LED RGB por feeds MQTT
 - Acionamento automatico do buzzer quando algum limite configurado e ultrapassado
-- Desligamento manual do buzzer pelo teclado
-- Exibicao de sensores, conectividade e limites no display OLED SSD1306
-- Ajuste local dos limites de alarme usando teclado matricial 4x4
-- Registro de alarmes em NVS com timestamp sincronizado via SNTP
-- Consulta e limpeza de logs pela serial
-- Operacao apenas em modo Station com reconexao automatica
+- Desligamento manual do buzzer pelo teclado matricial
+- Exibicao das informacoes principais no display OLED
+- Configuracao local de limites minimos e maximos para temperatura, luminosidade e umidade
+- Registro de alarmes em NVS
+- Consulta e limpeza do historico de alarmes pela serial
+- Operacao em modo WiFi Station com tentativa de reconexao automatica
 
-## Estrutura
+## Organizacao do projeto
 
 ```text
 iot-station-freertos/
@@ -42,29 +43,29 @@ iot-station-freertos/
     `-- app_main.c
 ```
 
-## Mapeamento dos componentes
+## Descricao dos modulos
 
-- `wifi_manager`: conexao em STA e reconexao automatica
-- `mqtt_service`: conexao com Adafruit IO, publicacao dos sensores e assinatura dos feeds do LED RGB
-- `sensor_service`: leitura de LDR via ADC e DHT11 via GPIO
-- `actuator_service`: PWM do LED RGB e do buzzer
-- `display_service`: driver SSD1306 via I2C e renderizacao da interface local
-- `keypad_service`: varredura do teclado 4x4 e envio de teclas por fila
-- `alarm_service`: comparacao das leituras com os limites configurados
-- `storage_service`: persistencia dos limites e do log de alarmes em NVS
-- `console_service`: comandos seriais `logs`, `clearlogs` e `limits`
-- `time_service`: sincronizacao SNTP para carimbar os logs com data e hora
+- `wifi_manager`: faz a conexao WiFi em modo STA e cuida da reconexao
+- `mqtt_service`: publica sensores no Adafruit IO e recebe comandos para o LED RGB
+- `sensor_service`: concentra a leitura do DHT11 e do LDR
+- `actuator_service`: controla LED RGB e buzzer por PWM
+- `display_service`: envia para o OLED os dados de sensores, alarmes e conectividade
+- `keypad_service`: faz a leitura do teclado matricial
+- `alarm_service`: compara as leituras com os limites definidos
+- `storage_service`: salva limites e logs de alarmes em NVS
+- `console_service`: trata os comandos enviados pela serial
+- `time_service`: sincroniza data e hora via SNTP
 
-## Controles no teclado
+## Controles do teclado
 
-- `A`: campo anterior
-- `B`: proximo campo
-- `C`: decrementa o limite selecionado
-- `D`: incrementa o limite selecionado
+- `A`: seleciona o campo anterior
+- `B`: seleciona o proximo campo
+- `C`: diminui o valor do limite atual
+- `D`: aumenta o valor do limite atual
 - `*`: desliga o buzzer manualmente
-- `#`: salva novamente os limites atuais
+- `#`: salva os limites
 
-## Feeds esperados no Adafruit IO
+## Feeds utilizados no Adafruit IO
 
 - `temperatura`
 - `umidade`
@@ -77,12 +78,15 @@ iot-station-freertos/
 ## Como configurar
 
 1. Instale o ESP-IDF 5.x.
-2. Abra a pasta `iot-station-freertos`.
-3. Ajuste WiFi, usuario e chave do Adafruit IO em [components/app_config/include/app_config.h](/C:/Users/danie/OneDrive/Documentos/New%20project/iot-station-freertos/components/app_config/include/app_config.h:1).
-4. Revise os pinos do OLED, DHT11, LDR, teclado, buzzer e LED RGB no mesmo arquivo para bater com a sua montagem real.
+2. Abra a pasta do projeto `iot-station-freertos`.
+3. Edite o arquivo `components/app_config/include/app_config.h`.
+4. Configure:
+   - nome e senha da rede WiFi
+   - usuario e chave do Adafruit IO
+   - pinos usados no OLED, DHT11, LDR, teclado, buzzer e LED RGB
 5. Crie os feeds listados acima no Adafruit IO.
 
-## Como compilar e gravar
+## Compilacao e gravacao
 
 ```bash
 idf.py set-target esp32c3
@@ -90,21 +94,19 @@ idf.py build
 idf.py flash monitor
 ```
 
-## Uso pela serial
+## Comandos disponiveis na serial
 
-No monitor serial, digite:
+- `logs`: mostra o historico de alarmes salvo em memoria
+- `clearlogs`: apaga o historico
+- `limits`: exibe os limites atualmente configurados
 
-- `logs` para listar o historico de alarmes
-- `clearlogs` para apagar o historico
-- `limits` para imprimir os limites atuais
+## Observacoes
 
-## Observacoes importantes
-
-- Os pinos em `app_config.h` sao uma base de referencia e devem ser adaptados ao hardware real montado no laboratorio.
-- O projeto foi estruturado para estudo e extensao. Em uma entrega final, vale complementar com fotos, video e um diagrama feito no Draw.io ou Fritzing.
-- O timestamp depende de WiFi e sincronizacao SNTP. Antes disso, o log usa `UNSYNCED`.
+- Os pinos definidos em `app_config.h` devem ser ajustados de acordo com a montagem real do circuito.
+- O registro com data e hora depende da sincronizacao SNTP.
+- Antes da sincronizacao, o sistema usa `UNSYNCED` como referencia no log.
 
 ## Documentacao complementar
 
-- Diagrama de blocos: [docs/hardware-block-diagram.md](/C:/Users/danie/OneDrive/Documentos/New%20project/iot-station-freertos/docs/hardware-block-diagram.md:1)
-- Relatorio tecnico: [docs/technical-report.md](/C:/Users/danie/OneDrive/Documentos/New%20project/iot-station-freertos/docs/technical-report.md:1)
+- Diagrama de blocos: [docs/hardware-block-diagram.md](docs/hardware-block-diagram.md)
+- Relatorio tecnico: [docs/technical-report.md](docs/technical-report.md)
